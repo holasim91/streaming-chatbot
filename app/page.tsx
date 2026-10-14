@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function Home() {
   const [sentMsgs, setSentMsgs] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
+  const listRef = useRef<HTMLUListElement>(null);
   const onSubmitChat = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (msg.trim() === "") return;
@@ -14,9 +15,18 @@ export default function Home() {
     });
     setMsg("");
   };
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight - el.clientHeight;
+  }, [sentMsgs]);
   return (
     <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col">
-      <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
+      <ul
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4 scroll-smooth"
+        ref={listRef}
+      >
         {sentMsgs.map((m, i) => (
           <li
             key={i}
