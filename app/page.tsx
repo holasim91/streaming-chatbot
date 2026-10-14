@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export default function Home() {
-  const [sentMsgs, setSentMsgs] = useState<string[]>([]);
+  const [sentMsgs, setSentMsgs] = useState<Message[]>([]);
   const [msg, setMsg] = useState("");
   const listRef = useRef<HTMLUListElement>(null);
   const onSubmitChat = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (msg.trim() === "") return;
     setSentMsgs((prev) => {
-      const newChat = [...prev, msg];
-      return newChat;
+      return [...prev, { role: "user", content: msg }];
     });
     setMsg("");
   };
@@ -30,9 +34,13 @@ export default function Home() {
         {sentMsgs.map((m, i) => (
           <li
             key={i}
-            className="max-w-[80%] self-end whitespace-pre-wrap break-words rounded-2xl bg-zinc-900 px-4 py-2 text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className={`max-w-[80%] whitespace-pre-wrap wrap-break-word rounded-2xl px-4 py-2 ${
+              m.role === "user"
+                ? "self-end bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "self-start bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+            }`}
           >
-            {m}
+            {m.content}
           </li>
         ))}
       </ul>
