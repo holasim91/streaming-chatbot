@@ -10,6 +10,7 @@ type Message = {
 export default function Home() {
   const [sentMsgs, setSentMsgs] = useState<Message[]>([]);
   const [msg, setMsg] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
 
   const appendToLastMsg = (chunk: string) => {
@@ -48,16 +49,22 @@ export default function Home() {
     }
   };
 
-  const onSubmitChat = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const onSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (msg.trim() === "") return;
-    setSentMsgs((prev) => {
-      return [...prev, { role: "user", content: msg }];
-    });
+    if (msg.trim() === "" || isStreaming) return;
+    try {
+      setSentMsgs((prev) => {
+        return [...prev, { role: "user", content: msg }];
+      });
+      setMsg("");
+      setIsStreaming(true);
 
-    sendMsg(msg);
-
-    setMsg("");
+      await sendMsg(msg);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsStreaming(false);
+    }
   };
 
   useEffect(() => {
@@ -97,7 +104,8 @@ export default function Home() {
         />
         <button
           type="submit"
-          className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:enabled:hover:bg-zinc-300"
+          disabled={isStreaming}
         >
           제출
         </button>
