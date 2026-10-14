@@ -5,7 +5,6 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const message = body?.message;
-
   if (typeof message !== "string" || message.trim() === "") {
     return Response.json(
       { error: "message must be a non-empty string" },
