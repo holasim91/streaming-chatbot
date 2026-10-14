@@ -11,12 +11,52 @@ export default function Home() {
   const [sentMsgs, setSentMsgs] = useState<Message[]>([]);
   const [msg, setMsg] = useState("");
   const listRef = useRef<HTMLUListElement>(null);
+
+  const appendToLastMsg = (chunk: string) => {
+    if (!chunk) return;
+    setSentMsgs((prev) => {
+      const msgs = [...prev];
+      const latestMsg = msgs[msgs.length - 1];
+      msgs[msgs.length - 1] = {
+        ...latestMsg,
+        content: latestMsg.content + chunk,
+      };
+      return msgs;
+    });
+  };
+
+  const sendMsg = async (text: string) => {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+    if (!res.ok || !res.body) return;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    setSentMsgs((prev) => [...prev, { role: "assistant", content: "" }]);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        const lastChunk = decoder.decode();
+        appendToLastMsg(lastChunk);
+        break;
+      }
+      const chunk = decoder.decode(value, { stream: true });
+      appendToLastMsg(chunk);
+    }
+  };
+
   const onSubmitChat = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (msg.trim() === "") return;
     setSentMsgs((prev) => {
       return [...prev, { role: "user", content: msg }];
     });
+
+    sendMsg(msg);
+
     setMsg("");
   };
 
@@ -25,6 +65,7 @@ export default function Home() {
     if (!el) return;
     el.scrollTop = el.scrollHeight - el.clientHeight;
   }, [sentMsgs]);
+
   return (
     <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col">
       <ul
