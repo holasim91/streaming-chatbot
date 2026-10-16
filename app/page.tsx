@@ -7,6 +7,26 @@ type Message = {
   content: string;
   error?: string;
 };
+const ERROR_MESSAGE = "응답을 받지 못했어요. 잠시 후 다시 시도해 주세요!";
+const withError = (msgs: Message[]): Message[] => {
+  const newMsgs = [...msgs];
+  const latestMsg = newMsgs[newMsgs.length - 1];
+  if (latestMsg?.role === "assistant") {
+    newMsgs[newMsgs.length - 1] = {
+      ...latestMsg,
+      error: ERROR_MESSAGE,
+    };
+    return newMsgs;
+  }
+  return [
+    ...msgs,
+    {
+      role: "assistant",
+      content: "",
+      error: ERROR_MESSAGE,
+    },
+  ];
+};
 
 export default function Home() {
   const [sentMsgs, setSentMsgs] = useState<Message[]>([]);
@@ -64,14 +84,8 @@ export default function Home() {
 
       await sendMsg(msg);
     } catch (error) {
-      setSentMsgs((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "",
-          error: "응답을 받지 못했어요. 잠시 후 다시 시도해 주세요!",
-        },
-      ]);
+      setSentMsgs((prev) => withError(prev));
+
       console.error(error);
     } finally {
       setIsStreaming(false);
@@ -96,12 +110,21 @@ export default function Home() {
             className={`max-w-[80%] whitespace-pre-wrap wrap-break-word rounded-2xl px-4 py-2 ${
               m.role === "user"
                 ? "self-end bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : m.error
-                  ? "self-start border border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
-                  : "self-start bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                : "self-start bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
             }`}
           >
-            {m.error ?? m.content}
+            {m.content}
+            {m.error && (
+              <p
+                className={`text-sm text-red-700 dark:text-red-400 ${
+                  m.content
+                    ? "mt-2 border-t border-zinc-300 pt-2 dark:border-zinc-700"
+                    : ""
+                }`}
+              >
+                {m.error}
+              </p>
+            )}
           </li>
         ))}
       </ul>
