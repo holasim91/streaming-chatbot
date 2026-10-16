@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Streaming Chatbot
 
-## Getting Started
+LLM 응답처럼 **답변이 한 글자씩 실시간으로 나타나는** 챗봇 웹앱입니다.
+서버가 보내는 스트림을 프론트엔드에서 직접 읽어 화면에 이어 붙이고, 응답 도중 연결이 끊기는 상황까지 처리합니다.
 
-First, run the development server:
+> 🚧 **진행 중** — 현재는 가짜 스트리밍 서버로 동작하며, 실제 LLM API 연동을 준비하고 있습니다.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 기술 스택
+
+- **Next.js 16** (App Router, Route Handler)
+- **React 19**
+- **TypeScript**
+- **Tailwind CSS 4**
+
+## 주요 기능
+
+### 스트리밍 응답 표시
+- 메시지를 보내면 빈 AI 말풍선을 먼저 만들고, 서버에서 청크가 도착할 때마다 글자를 이어 붙입니다.
+- `fetch` 응답의 `ReadableStream`을 `getReader()`로 직접 읽고, `TextDecoder`로 바이트를 문자열로 변환합니다.
+- 한글처럼 여러 바이트로 이루어진 글자가 청크 경계에서 잘려도 깨지지 않도록 `stream` 옵션으로 디코딩합니다.
+
+### 채팅 UI
+- 사용자 / AI 메시지를 위치와 색으로 구분하는 말풍선
+- 새 메시지가 오면 목록 맨 아래로 자동 스크롤
+- 응답을 받는 동안 전송 버튼 비활성화 (중복 전송 방지)
+- 라이트 / 다크 모드 대응
+
+### 에러 처리
+실패 지점 세 가지를 한 곳에서 처리하며, 모두 AI 말풍선 안에 안내 문구로 표시합니다.
+
+| 상황 | 화면 |
+|---|---|
+| 요청 자체 실패 (네트워크 오류) | AI 자리에 에러 안내 |
+| 서버 에러 응답 (4xx, 5xx) | AI 자리에 에러 안내 |
+| 스트리밍 도중 연결 끊김 | **받은 답변은 그대로 두고** 그 아래에 에러 안내 |
+
+에러 문구는 메시지 본문(`content`)과 분리된 화면 전용 필드로 관리해, 이후 LLM에 보낼 대화 기록에 섞이지 않도록 했습니다.
+
+## API
+
+프론트엔드와 백엔드는 아래 약속만 공유합니다. 백엔드를 실제 LLM으로 교체해도 프론트엔드 코드는 바뀌지 않습니다.
+
+```
+POST /api/chat
+Content-Type: application/json
+
+{ "message": "안녕하세요" }
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **성공**: `200`, `text/plain; charset=utf-8` 스트림으로 답변이 조금씩 도착
+- **실패**: `message`가 없거나 비어 있으면 `400`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 프로젝트 구조
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+app/
+├── page.tsx              # 채팅 화면 (메시지 상태, 스트림 읽기, 에러 처리)
+├── layout.tsx
+├── globals.css
+└── api/chat/route.ts     # 스트리밍 응답 Route Handler
+```
 
-## Learn More
+## 실행 방법
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 엽니다.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 로드맵
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [x] 채팅 화면과 스트리밍 응답 표시
+- [x] 응답 중 전송 버튼 비활성화
+- [x] 에러 처리 (요청 실패 / 에러 응답 / 스트리밍 도중 끊김)
+- [ ] 응답 중지 버튼 (`AbortController`)
+- [ ] 실제 LLM API 스트리밍 연동
+- [ ] 대화 기록 저장 및 조회
+- [ ] 배포
