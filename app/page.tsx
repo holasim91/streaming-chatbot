@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  error?: string;
 };
 
 export default function Home() {
@@ -32,7 +33,9 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text }),
     });
-    if (!res.ok || !res.body) return;
+    if (!res.ok || !res.body) {
+      throw new Error(`서버 응답 실패:${res.status}`);
+    }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     setSentMsgs((prev) => [...prev, { role: "assistant", content: "" }]);
@@ -61,6 +64,14 @@ export default function Home() {
 
       await sendMsg(msg);
     } catch (error) {
+      setSentMsgs((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "",
+          error: "응답을 받지 못했어요. 잠시 후 다시 시도해 주세요!",
+        },
+      ]);
       console.error(error);
     } finally {
       setIsStreaming(false);
@@ -85,10 +96,12 @@ export default function Home() {
             className={`max-w-[80%] whitespace-pre-wrap wrap-break-word rounded-2xl px-4 py-2 ${
               m.role === "user"
                 ? "self-end bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "self-start bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                : m.error
+                  ? "self-start border border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                  : "self-start bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
             }`}
           >
-            {m.content}
+            {m.error ?? m.content}
           </li>
         ))}
       </ul>
