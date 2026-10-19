@@ -8,18 +8,18 @@ type Message = {
   error?: string;
 };
 const ERROR_MESSAGE = "응답을 받지 못했어요. 잠시 후 다시 시도해 주세요!";
-const withError = (msgs: Message[]): Message[] => {
-  const newMsgs = [...msgs];
-  const latestMsg = newMsgs[newMsgs.length - 1];
-  if (latestMsg?.role === "assistant") {
-    newMsgs[newMsgs.length - 1] = {
-      ...latestMsg,
+const withError = (messages: Message[]): Message[] => {
+  const newMessages = [...messages];
+  const latestMessage = newMessages[newMessages.length - 1];
+  if (latestMessage?.role === "assistant") {
+    newMessages[newMessages.length - 1] = {
+      ...latestMessage,
       error: ERROR_MESSAGE,
     };
-    return newMsgs;
+    return newMessages;
   }
   return [
-    ...msgs,
+    ...messages,
     {
       role: "assistant",
       content: "",
@@ -29,25 +29,25 @@ const withError = (msgs: Message[]): Message[] => {
 };
 
 export default function Home() {
-  const [sentMsgs, setSentMsgs] = useState<Message[]>([]);
-  const [msg, setMsg] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [draft, setDraft] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const appendToLastMsg = (chunk: string) => {
+  const appendToLastMessage = (chunk: string) => {
     if (!chunk) return;
-    setSentMsgs((prev) => {
-      const msgs = [...prev];
-      const latestMsg = msgs[msgs.length - 1];
-      msgs[msgs.length - 1] = {
-        ...latestMsg,
-        content: latestMsg.content + chunk,
+    setMessages((prev) => {
+      const messages = [...prev];
+      const latestMessage = messages[messages.length - 1];
+      messages[messages.length - 1] = {
+        ...latestMessage,
+        content: latestMessage.content + chunk,
       };
-      return msgs;
+      return messages;
     });
   };
 
-  const sendMsg = async (text: string) => {
+  const streamReply = async (text: string) => {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,33 +58,33 @@ export default function Home() {
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    setSentMsgs((prev) => [...prev, { role: "assistant", content: "" }]);
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
         const lastChunk = decoder.decode();
-        appendToLastMsg(lastChunk);
+        appendToLastMessage(lastChunk);
         break;
       }
       const chunk = decoder.decode(value, { stream: true });
-      appendToLastMsg(chunk);
+      appendToLastMessage(chunk);
     }
   };
 
-  const onSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (msg.trim() === "" || isStreaming) return;
+    if (draft.trim() === "" || isStreaming) return;
     try {
-      setSentMsgs((prev) => {
-        return [...prev, { role: "user", content: msg }];
+      setMessages((prev) => {
+        return [...prev, { role: "user", content: draft }];
       });
-      setMsg("");
+      setDraft("");
       setIsStreaming(true);
 
-      await sendMsg(msg);
+      await streamReply(draft);
     } catch (error) {
-      setSentMsgs((prev) => withError(prev));
+      setMessages((prev) => withError(prev));
 
       console.error(error);
     } finally {
@@ -96,7 +96,7 @@ export default function Home() {
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight - el.clientHeight;
-  }, [sentMsgs]);
+  }, [messages]);
 
   return (
     <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col">
@@ -104,7 +104,7 @@ export default function Home() {
         className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4 scroll-smooth"
         ref={listRef}
       >
-        {sentMsgs.map((m, i) => (
+        {messages.map((m, i) => (
           <li
             key={i}
             className={`max-w-[80%] whitespace-pre-wrap wrap-break-word rounded-2xl px-4 py-2 ${
@@ -129,13 +129,13 @@ export default function Home() {
         ))}
       </ul>
       <form
-        onSubmit={onSubmitChat}
+        onSubmit={handleSubmitChat}
         className="flex gap-2 border-t border-zinc-200 p-4 dark:border-zinc-800"
       >
         <input
           type="text"
-          value={msg}
-          onChange={(e) => setMsg(e.target.value)}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
           className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-300"
         />
         <button
