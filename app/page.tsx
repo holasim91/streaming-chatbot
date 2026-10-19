@@ -33,27 +33,29 @@ const streamReply = async (text: string, onChunk: (chunk: string) => void) => {
   }
 };
 
-const withError = (messages: Message[]): Message[] => {
+const updateLastMessage = (
+  messages: Message[],
+  onUpdate: (msgs: Message) => Message,
+): Message[] => {
   const newMessages = [...messages];
   const latestMessage = newMessages[newMessages.length - 1];
   if (latestMessage?.role !== "assistant") return messages;
-  newMessages[newMessages.length - 1] = {
-    ...latestMessage,
-    error: ERROR_MESSAGE,
-  };
+  newMessages[newMessages.length - 1] = onUpdate(latestMessage);
+
   return newMessages;
 };
 
-const withChunk = (messages: Message[], chunk: string): Message[] => {
-  const newMessages = [...messages];
-  const latestMessage = newMessages[newMessages.length - 1];
-  if (latestMessage?.role !== "assistant") return messages;
-  newMessages[newMessages.length - 1] = {
-    ...latestMessage,
-    content: latestMessage.content + chunk,
-  };
-  return newMessages;
-};
+const withError = (messages: Message[]): Message[] =>
+  updateLastMessage(messages, (message) => ({
+    ...message,
+    error: ERROR_MESSAGE,
+  }));
+
+const withChunk = (messages: Message[], chunk: string): Message[] =>
+  updateLastMessage(messages, (message) => ({
+    ...message,
+    content: message.content + chunk,
+  }));
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
