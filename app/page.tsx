@@ -44,6 +44,17 @@ const withError = (messages: Message[]): Message[] => {
   return newMessages;
 };
 
+const withChunk = (messages: Message[], chunk: string): Message[] => {
+  const newMessages = [...messages];
+  const latestMessage = newMessages[newMessages.length - 1];
+  if (latestMessage?.role !== "assistant") return messages;
+  newMessages[newMessages.length - 1] = {
+    ...latestMessage,
+    content: latestMessage.content + chunk,
+  };
+  return newMessages;
+};
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -52,15 +63,7 @@ export default function Home() {
 
   const appendToLastMessage = (chunk: string) => {
     if (!chunk) return;
-    setMessages((prev) => {
-      const msgs = [...prev];
-      const latestMessage = msgs[msgs.length - 1];
-      msgs[msgs.length - 1] = {
-        ...latestMessage,
-        content: latestMessage.content + chunk,
-      };
-      return msgs;
-    });
+    setMessages((prev) => withChunk(prev, chunk));
   };
 
   const handleSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
