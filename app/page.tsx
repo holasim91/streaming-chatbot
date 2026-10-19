@@ -8,24 +8,40 @@ type Message = {
   error?: string;
 };
 const ERROR_MESSAGE = "응답을 받지 못했어요. 잠시 후 다시 시도해 주세요!";
+
+const streamReply = async (text: string, onChunk: (chunk: string) => void) => {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text }),
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`서버 응답 실패:${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      const lastChunk = decoder.decode();
+      onChunk(lastChunk);
+      break;
+    }
+    const chunk = decoder.decode(value, { stream: true });
+    onChunk(chunk);
+  }
+};
+
 const withError = (messages: Message[]): Message[] => {
   const newMessages = [...messages];
   const latestMessage = newMessages[newMessages.length - 1];
-  if (latestMessage?.role === "assistant") {
-    newMessages[newMessages.length - 1] = {
-      ...latestMessage,
-      error: ERROR_MESSAGE,
-    };
-    return newMessages;
-  }
-  return [
-    ...messages,
-    {
-      role: "assistant",
-      content: "",
-      error: ERROR_MESSAGE,
-    },
-  ];
+  if (latestMessage?.role !== "assistant") return messages;
+  newMessages[newMessages.length - 1] = {
+    ...latestMessage,
+    error: ERROR_MESSAGE,
+  };
+  return newMessages;
 };
 
 export default function Home() {
@@ -37,39 +53,14 @@ export default function Home() {
   const appendToLastMessage = (chunk: string) => {
     if (!chunk) return;
     setMessages((prev) => {
-      const messages = [...prev];
-      const latestMessage = messages[messages.length - 1];
-      messages[messages.length - 1] = {
+      const msgs = [...prev];
+      const latestMessage = msgs[msgs.length - 1];
+      msgs[msgs.length - 1] = {
         ...latestMessage,
         content: latestMessage.content + chunk,
       };
-      return messages;
+      return msgs;
     });
-  };
-
-  const streamReply = async (text: string) => {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    });
-    if (!res.ok || !res.body) {
-      throw new Error(`서버 응답 실패:${res.status}`);
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        const lastChunk = decoder.decode();
-        appendToLastMessage(lastChunk);
-        break;
-      }
-      const chunk = decoder.decode(value, { stream: true });
-      appendToLastMessage(chunk);
-    }
   };
 
   const handleSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -82,7 +73,8 @@ export default function Home() {
       setDraft("");
       setIsStreaming(true);
 
-      await streamReply(draft);
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      await streamReply(draft, appendToLastMessage);
     } catch (error) {
       setMessages((prev) => withError(prev));
 
