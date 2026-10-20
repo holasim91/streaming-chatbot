@@ -57,36 +57,48 @@ const withChunk = (messages: Message[], chunk: string): Message[] =>
     content: message.content + chunk,
   }));
 
-export default function Home() {
+const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [draft, setDraft] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const listRef = useRef<HTMLUListElement>(null);
-
   const appendToLastMessage = (chunk: string) => {
     if (!chunk) return;
     setMessages((prev) => withChunk(prev, chunk));
   };
 
-  const handleSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (draft.trim() === "" || isStreaming) return;
+  const send = async (text: string) => {
     try {
       setMessages((prev) => {
-        return [...prev, { role: "user", content: draft }];
+        return [...prev, { role: "user", content: text }];
       });
-      setDraft("");
-      setIsStreaming(true);
 
+      setIsStreaming(true);
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-      await streamReply(draft, appendToLastMessage);
+      await streamReply(text, appendToLastMessage);
     } catch (error) {
       setMessages((prev) => withError(prev));
-
       console.error(error);
     } finally {
       setIsStreaming(false);
     }
+  };
+
+  return {
+    messages,
+    isStreaming,
+    send,
+  };
+};
+
+export default function Home() {
+  const [draft, setDraft] = useState("");
+  const listRef = useRef<HTMLUListElement>(null);
+  const { messages, isStreaming, send } = useChat();
+
+  const handleSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (draft.trim() === "" || isStreaming) return;
+    setDraft("");
+    await send(draft);
   };
 
   useEffect(() => {
