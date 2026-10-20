@@ -6,14 +6,20 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   error?: string;
+  stopped?: boolean;
 };
 const ERROR_MESSAGE = "응답을 받지 못했어요. 잠시 후 다시 시도해 주세요!";
 
-const streamReply = async (text: string, onChunk: (chunk: string) => void) => {
+const streamReply = async (
+  text: string,
+  onChunk: (chunk: string) => void,
+  signal: AbortSignal,
+) => {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message: text }),
+    signal,
   });
   if (!res.ok || !res.body) {
     throw new Error(`서버 응답 실패:${res.status}`);
@@ -51,6 +57,12 @@ const withError = (messages: Message[]): Message[] =>
     error: ERROR_MESSAGE,
   }));
 
+const withStopped = (messages: Message[]): Message[] =>
+  updateLastMessage(messages, (message) => ({
+    ...message,
+    stopped: true,
+  }));
+
 const withChunk = (messages: Message[], chunk: string): Message[] =>
   updateLastMessage(messages, (message) => ({
     ...message,
@@ -60,6 +72,8 @@ const withChunk = (messages: Message[], chunk: string): Message[] =>
 const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const controllerRef = useRef<AbortController | null>(null);
+
   const appendToLastMessage = (chunk: string) => {
     if (!chunk) return;
     setMessages((prev) => withChunk(prev, chunk));
@@ -73,8 +87,17 @@ const useChat = () => {
 
       setIsStreaming(true);
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-      await streamReply(text, appendToLastMessage);
+      controllerRef.current = new AbortController();
+      await streamReply(
+        text,
+        appendToLastMessage,
+        controllerRef.current.signal,
+      );
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        setMessages((prev) => withStopped(prev));
+        return;
+      }
       setMessages((prev) => withError(prev));
       console.error(error);
     } finally {
@@ -82,17 +105,20 @@ const useChat = () => {
     }
   };
 
+  const stop = () => controllerRef.current?.abort();
+
   return {
     messages,
     isStreaming,
     send,
+    stop,
   };
 };
 
 export default function Home() {
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLUListElement>(null);
-  const { messages, isStreaming, send } = useChat();
+  const { messages, isStreaming, send, stop } = useChat();
 
   const handleSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -123,6 +149,7 @@ export default function Home() {
             }`}
           >
             {m.content}
+           
             {m.error && (
               <p
                 className={`text-sm text-red-700 dark:text-red-400 ${
@@ -132,6 +159,17 @@ export default function Home() {
                 }`}
               >
                 {m.error}
+              </p>
+            )}
+            {m.stopped && (
+              <p
+                className={`text-sm text-zinc-600 dark:text-zinc-400 ${
+                  m.content
+                    ? "mt-2 border-t border-zinc-300 pt-2 dark:border-zinc-700"
+                    : ""
+                }`}
+              >
+                응답을 멈췄어요.
               </p>
             )}
           </li>
@@ -147,13 +185,22 @@ export default function Home() {
           onChange={(e) => setDraft(e.target.value)}
           className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-300"
         />
-        <button
-          type="submit"
-          className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:enabled:hover:bg-zinc-300"
-          disabled={isStreaming}
-        >
-          제출
-        </button>
+        {isStreaming ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:enabled:hover:bg-zinc-300"
+            onClick={() => stop()}
+          >
+            중지
+          </button>
+        ) : (
+          <button
+            type="submit"
+            className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:enabled:hover:bg-zinc-300"
+          >
+            제출
+          </button>
+        )}
       </form>
     </div>
   );
