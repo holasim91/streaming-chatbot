@@ -72,21 +72,27 @@ Content-Type: application/json
 ## 프로젝트 구조
 
 ```
-app/
-├── page.tsx              # 채팅 화면 + useChat 훅 + 스트림 읽기 함수
+app/                      # 라우팅 전용 (페이지와 API)
+├── page.tsx              # 채팅 화면: 입력창, 자동 스크롤, 렌더링
 ├── layout.tsx
 ├── globals.css
 └── api/chat/route.ts     # Claude 스트리밍 응답을 text/plain으로 전달하는 Route Handler
+hooks/
+└── useChat.ts            # 메시지 목록, 응답 중 여부, send / stop 제공
+lib/                      # React와 무관한 코드
+├── streamReply.ts        # 요청을 보내고 스트림을 읽어 청크를 콜백으로 전달
+└── messages.ts           # 마지막 AI 메시지를 불변으로 갱신하는 순수 함수 (withChunk / withError / withStopped)
+types/
+└── chat.ts               # Message 타입
 ```
 
-`app/page.tsx` 안은 역할별로 나뉘어 있습니다.
+파일은 "무엇에 의존하는가"를 기준으로 나눴고, import는 한 방향으로만 흐릅니다.
 
-| 부분 | 역할 |
-|---|---|
-| `streamReply` | 요청을 보내고 스트림을 읽어 청크를 콜백으로 전달 (React와 무관) |
-| `updateLastMessage`, `withChunk`, `withError`, `withStopped` | 마지막 AI 메시지를 불변으로 갱신하는 순수 함수 |
-| `useChat` | 메시지 목록, 응답 중 여부, `send` / `stop` 제공 |
-| `Home` | 입력창, 자동 스크롤, 렌더링 |
+```
+app/page.tsx → hooks/ → lib/ → types/
+```
+
+`lib/`의 함수는 React를 모르기 때문에 화면이나 훅과 상관없이 따로 테스트하거나 재사용할 수 있습니다.
 
 ## 실행 방법
 

@@ -1,119 +1,7 @@
 "use client";
 
+import { useChat } from "@/hooks/useChat";
 import { useEffect, useRef, useState } from "react";
-
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-  error?: string;
-  stopped?: boolean;
-};
-const ERROR_MESSAGE = "응답을 받지 못했어요. 잠시 후 다시 시도해 주세요!";
-
-const streamReply = async (
-  text: string,
-  onChunk: (chunk: string) => void,
-  signal: AbortSignal,
-) => {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text }),
-    signal,
-  });
-  if (!res.ok || !res.body) {
-    throw new Error(`서버 응답 실패:${res.status}`);
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      const lastChunk = decoder.decode();
-      onChunk(lastChunk);
-      break;
-    }
-    const chunk = decoder.decode(value, { stream: true });
-    onChunk(chunk);
-  }
-};
-
-const updateLastMessage = (
-  messages: Message[],
-  onUpdate: (msgs: Message) => Message,
-): Message[] => {
-  const newMessages = [...messages];
-  const latestMessage = newMessages[newMessages.length - 1];
-  if (latestMessage?.role !== "assistant") return messages;
-  newMessages[newMessages.length - 1] = onUpdate(latestMessage);
-
-  return newMessages;
-};
-
-const withError = (messages: Message[]): Message[] =>
-  updateLastMessage(messages, (message) => ({
-    ...message,
-    error: ERROR_MESSAGE,
-  }));
-
-const withStopped = (messages: Message[]): Message[] =>
-  updateLastMessage(messages, (message) => ({
-    ...message,
-    stopped: true,
-  }));
-
-const withChunk = (messages: Message[], chunk: string): Message[] =>
-  updateLastMessage(messages, (message) => ({
-    ...message,
-    content: message.content + chunk,
-  }));
-
-const useChat = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const controllerRef = useRef<AbortController | null>(null);
-
-  const appendToLastMessage = (chunk: string) => {
-    if (!chunk) return;
-    setMessages((prev) => withChunk(prev, chunk));
-  };
-
-  const send = async (text: string) => {
-    try {
-      setMessages((prev) => {
-        return [...prev, { role: "user", content: text }];
-      });
-
-      setIsStreaming(true);
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-      controllerRef.current = new AbortController();
-      await streamReply(
-        text,
-        appendToLastMessage,
-        controllerRef.current.signal,
-      );
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        setMessages((prev) => withStopped(prev));
-        return;
-      }
-      setMessages((prev) => withError(prev));
-      console.error(error);
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
-  const stop = () => controllerRef.current?.abort();
-
-  return {
-    messages,
-    isStreaming,
-    send,
-    stop,
-  };
-};
 
 export default function Home() {
   const [draft, setDraft] = useState("");
@@ -149,7 +37,7 @@ export default function Home() {
             }`}
           >
             {m.content}
-           
+
             {m.error && (
               <p
                 className={`text-sm text-red-700 dark:text-red-400 ${
