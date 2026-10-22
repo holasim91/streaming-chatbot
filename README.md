@@ -91,26 +91,33 @@ Content-Type: application/json
 
 ```
 app/                      # 라우팅 전용 (페이지와 API)
-├── page.tsx              # 채팅 화면: 입력창, 자동 스크롤, 렌더링
+├── page.tsx              # 채팅 화면: useChat과 컴포넌트를 연결하고 자동 스크롤 처리
 ├── layout.tsx
 ├── globals.css
 └── api/chat/route.ts     # 대화를 검사하고 잘라 Claude에 보낸 뒤, 스트리밍 응답을 text/plain으로 전달하는 Route Handler
+components/               # 화면 조각 (필요한 값은 props로만 받음)
+├── MessageBubble.tsx     # 말풍선 하나 (본문, 에러·중지 안내)
+└── ChatInput.tsx         # 입력창과 제출 / 중지 버튼, 입력 중인 글자 상태
 hooks/
 └── useChat.ts            # 메시지 목록, 응답 중 여부, send / stop 제공
 lib/                      # React와 무관한 코드
 ├── streamReply.ts        # 대화를 보내고 스트림을 읽어 청크를 콜백으로 전달
 └── messages.ts           # 메시지 배열을 다루는 순수 함수 (withChunk / withError / withStopped, Claude용으로 바꾸는 transformForClaude)
 types/
-└── chat.ts               # Message(화면용), History(Claude에 보낼 대화) 타입
+└── chat.ts               # Message(화면용), History(Claude에 보낼 대화) 타입. 프론트엔드와 서버가 함께 사용
 ```
 
 파일은 "무엇에 의존하는가"를 기준으로 나눴고, import는 한 방향으로만 흐릅니다.
 
 ```
-app/page.tsx → hooks/ → lib/ → types/
+app/page.tsx ─┬→ components/ ───→ types/
+              └→ hooks/ → lib/ ─→ types/
+app/api/chat/route.ts ──────────→ types/
 ```
 
-`lib/`의 함수는 React를 모르기 때문에 화면이나 훅과 상관없이 따로 테스트하거나 재사용할 수 있습니다.
+- `lib/`의 함수는 React를 모르기 때문에 화면이나 훅과 상관없이 따로 테스트하거나 재사용할 수 있습니다.
+- `components/`는 `useChat`을 모르고 props로 받은 값과 함수만 씁니다. 입력 폼은 폼 이벤트가 아니라 **입력한 글자만** 부모에게 넘기고, 입력 중인 글자는 폼 안에서만 관리해 글자를 칠 때 말풍선 목록이 다시 그려지지 않습니다.
+- `route.ts`의 요청 검사와 대화 자르기는 HTTP를 모르는 순수 함수로 분리하고, `400` 응답 같은 HTTP 처리만 Route Handler에 남겼습니다. 프론트엔드와 서버는 같은 `History` 타입을 쓰되, 타입은 실행 중에는 사라지므로 서버는 요청을 직접 검사한 뒤에만 그 타입으로 다룹니다.
 
 ## 실행 방법
 
