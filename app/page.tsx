@@ -1,20 +1,13 @@
 "use client";
 
+import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
 import { useChat } from "@/hooks/useChat";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 export default function Home() {
-  const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLUListElement>(null);
   const { messages, isStreaming, send, stop } = useChat();
-
-  const handleSubmitChat = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (draft.trim() === "" || isStreaming) return;
-    setDraft("");
-    await send(draft);
-  };
 
   useEffect(() => {
     const el = listRef.current;
@@ -32,33 +25,7 @@ export default function Home() {
           <MessageBubble key={i} message={m} />
         ))}
       </ul>
-      <form
-        onSubmit={handleSubmitChat}
-        className="flex gap-2 border-t border-zinc-200 p-4 dark:border-zinc-800"
-      >
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-300"
-        />
-        {isStreaming ? (
-          <button
-            type="button"
-            className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:enabled:hover:bg-zinc-300"
-            onClick={() => stop()}
-          >
-            중지
-          </button>
-        ) : (
-          <button
-            type="submit"
-            className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white enabled:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:enabled:hover:bg-zinc-300"
-          >
-            제출
-          </button>
-        )}
-      </form>
+      <ChatInput onSubmit={send} onStop={stop} isStreaming={isStreaming} />
     </div>
   );
 }
