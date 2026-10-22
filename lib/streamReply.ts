@@ -1,12 +1,14 @@
+import type { History } from "@/types/chat";
+
 export const streamReply = async (
-  text: string,
+  history: History,
   onChunk: (chunk: string) => void,
   signal: AbortSignal,
 ) => {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text }),
+    body: JSON.stringify({ messages: history }),
     signal,
   });
   if (!res.ok || !res.body) {

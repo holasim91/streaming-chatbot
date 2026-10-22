@@ -31,3 +31,8 @@ export const withChunk = (messages: Message[], chunk: string): Message[] =>
     ...message,
     content: message.content + chunk,
   }));
+
+export const transformForClaude = (messages: Message[]) =>
+  messages
+    .filter((m) => m.content !== "")
+    .map(({ role, content }) => ({ role, content }));

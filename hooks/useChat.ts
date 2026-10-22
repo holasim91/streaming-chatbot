@@ -1,4 +1,9 @@
-import { withChunk, withError, withStopped } from "@/lib/messages";
+import {
+  transformForClaude,
+  withChunk,
+  withError,
+  withStopped,
+} from "@/lib/messages";
 import { streamReply } from "@/lib/streamReply";
 import type { Message } from "@/types/chat";
 import { useRef, useState } from "react";
@@ -22,8 +27,12 @@ export const useChat = () => {
       setIsStreaming(true);
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
       controllerRef.current = new AbortController();
+      const history = transformForClaude([
+        ...messages,
+        { role: "user", content: text },
+      ]);
       await streamReply(
-        text,
+        history,
         appendToLastMessage,
         controllerRef.current.signal,
       );

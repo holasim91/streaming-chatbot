@@ -4,3 +4,4 @@ export type Message = {
   error?: string;
   stopped?: boolean;
 };
+export type History = Pick<Message, "role" | "content">[];
